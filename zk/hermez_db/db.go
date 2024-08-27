@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/gateway-fm/cdk-erigon-lib/common"
+	"github.com/gateway-fm/cdk-erigon-lib/common/length"
 	"github.com/gateway-fm/cdk-erigon-lib/kv"
 
 	"encoding/json"
@@ -17,43 +18,44 @@ import (
 	"github.com/ledgerwatch/log/v3"
 )
 
-const L1VERIFICATIONS = "hermez_l1Verifications"                        // l1blockno, batchno -> l1txhash
-const L1SEQUENCES = "hermez_l1Sequences"                                // l1blockno, batchno -> l1txhash
-const FORKIDS = "hermez_forkIds"                                        // batchNo -> forkId
-const FORKID_BLOCK = "hermez_forkIdBlock"                               // forkId -> startBlock
-const BLOCKBATCHES = "hermez_blockBatches"                              // l2blockno -> batchno
-const GLOBAL_EXIT_ROOTS = "hermez_globalExitRootsSaved"                 // GER -> true
-const BLOCK_GLOBAL_EXIT_ROOTS = "hermez_globalExitRoots"                // l2blockno -> GER
-const GLOBAL_EXIT_ROOTS_BATCHES = "hermez_globalExitRoots_batches"      // batchkno -> GER
-const TX_PRICE_PERCENTAGE = "hermez_txPricePercentage"                  // txHash -> txPricePercentage
-const STATE_ROOTS = "hermez_stateRoots"                                 // l2blockno -> stateRoot
-const L1_INFO_TREE_UPDATES = "l1_info_tree_updates"                     // index -> L1InfoTreeUpdate
-const L1_INFO_TREE_UPDATES_BY_GER = "l1_info_tree_updates_by_ger"       // GER -> L1InfoTreeUpdate
-const BLOCK_L1_INFO_TREE_INDEX = "block_l1_info_tree_index"             // block number -> l1 info tree index
-const BLOCK_L1_INFO_TREE_INDEX_PROGRESS = "block_l1_info_tree_progress" // block number -> l1 info tree progress
-const L1_INJECTED_BATCHES = "l1_injected_batches"                       // index increasing by 1 -> injected batch for the start of the chain
-const BLOCK_INFO_ROOTS = "block_info_roots"                             // block number -> block info root hash
-const L1_BLOCK_HASHES = "l1_block_hashes"                               // l1 block hash -> true
-const BLOCK_L1_BLOCK_HASHES = "block_l1_block_hashes"                   // block number -> l1 block hash
-const L1_BLOCK_HASH_GER = "l1_block_hash_ger"                           // l1 block hash -> GER
-const INTERMEDIATE_TX_STATEROOTS = "hermez_intermediate_tx_stateRoots"  // l2blockno -> stateRoot
-const BATCH_WITNESSES = "hermez_batch_witnesses"                        // batch number -> witness
-const BATCH_COUNTERS = "hermez_batch_counters"                          // batch number -> counters
-const L1_BATCH_DATA = "l1_batch_data"                                   // batch number -> l1 batch data from transaction call data
-const REUSED_L1_INFO_TREE_INDEX = "reused_l1_info_tree_index"           // block number => const 1
-const LATEST_USED_GER = "latest_used_ger"                               // batch number -> GER latest used GER
-const BATCH_BLOCKS = "batch_blocks"                                     // batch number -> block numbers (concatenated together)
-const SMT_DEPTHS = "smt_depths"                                         // block number -> smt depth
-const L1_INFO_LEAVES = "l1_info_leaves"                                 // l1 info tree index -> l1 info tree leaf
-const L1_INFO_ROOTS = "l1_info_roots"                                   // root hash -> l1 info tree index
-const INVALID_BATCHES = "invalid_batches"                               // batch number -> true
-const BATCH_PARTIALLY_PROCESSED = "batch_partially_processed"           // batch number -> true
-const LOCAL_EXIT_ROOTS = "local_exit_roots"                             // batch number -> local exit root
-const ROllUP_TYPES_FORKS = "rollup_types_forks"                         // rollup type id -> fork id
-const FORK_HISTORY = "fork_history"                                     // index -> fork id + last verified batch
-const JUST_UNWOUND = "just_unwound"                                     // batch number -> true
-const PLAIN_STATE_VERSION = "plain_state_version"                       // batch number -> true
-const ERIGON_VERSIONS = "erigon_versions"                               // erigon version -> timestamp of startup
+const L1VERIFICATIONS = "hermez_l1Verifications"                          // l1blockno, batchno -> l1txhash
+const L1SEQUENCES = "hermez_l1Sequences"                                  // l1blockno, batchno -> l1txhash
+const FORKIDS = "hermez_forkIds"                                          // batchNo -> forkId
+const FORKID_BLOCK = "hermez_forkIdBlock"                                 // forkId -> startBlock
+const BLOCKBATCHES = "hermez_blockBatches"                                // l2blockno -> batchno
+const GLOBAL_EXIT_ROOTS = "hermez_globalExitRootsSaved"                   // GER -> true
+const BLOCK_GLOBAL_EXIT_ROOTS = "hermez_globalExitRoots"                  // l2blockno -> GER
+const GLOBAL_EXIT_ROOTS_BATCHES = "hermez_globalExitRoots_batches"        // batchkno -> GER
+const TX_PRICE_PERCENTAGE = "hermez_txPricePercentage"                    // txHash -> txPricePercentage
+const STATE_ROOTS = "hermez_stateRoots"                                   // l2blockno -> stateRoot
+const L1_INFO_TREE_UPDATES = "l1_info_tree_updates"                       // index -> L1InfoTreeUpdate
+const L1_INFO_TREE_UPDATES_BY_GER = "l1_info_tree_updates_by_ger"         // GER -> L1InfoTreeUpdate
+const BLOCK_L1_INFO_TREE_INDEX = "block_l1_info_tree_index"               // block number -> l1 info tree index
+const BLOCK_L1_INFO_TREE_INDEX_PROGRESS = "block_l1_info_tree_progress"   // block number -> l1 info tree progress
+const L1_INJECTED_BATCHES = "l1_injected_batches"                         // index increasing by 1 -> injected batch for the start of the chain
+const BLOCK_INFO_ROOTS = "block_info_roots"                               // block number -> block info root hash
+const L1_BLOCK_HASHES = "l1_block_hashes"                                 // l1 block hash -> true
+const BLOCK_L1_BLOCK_HASHES = "block_l1_block_hashes"                     // block number -> l1 block hash
+const L1_BLOCK_HASH_GER = "l1_block_hash_ger"                             // l1 block hash -> GER
+const INTERMEDIATE_TX_STATEROOTS = "hermez_intermediate_tx_stateRoots"    // l2blockno -> stateRoot
+const BATCH_WITNESSES = "hermez_batch_witnesses"                          // batch number -> witness
+const BATCH_COUNTERS = "hermez_batch_counters"                            // batch number -> counters
+const L1_BATCH_DATA = "l1_batch_data"                                     // batch number -> l1 batch data from transaction call data
+const REUSED_L1_INFO_TREE_INDEX = "reused_l1_info_tree_index"             // block number => const 1
+const LATEST_USED_GER = "latest_used_ger"                                 // batch number -> GER latest used GER
+const BATCH_BLOCKS = "batch_blocks"                                       // batch number -> block numbers (concatenated together)
+const SMT_DEPTHS = "smt_depths"                                           // block number -> smt depth
+const L1_INFO_LEAVES = "l1_info_leaves"                                   // l1 info tree index -> l1 info tree leaf
+const L1_INFO_ROOTS = "l1_info_roots"                                     // root hash -> l1 info tree index
+const INVALID_BATCHES = "invalid_batches"                                 // batch number -> true
+const LOCAL_EXIT_ROOTS = "local_exit_roots"                               // batch number -> local exit root
+const ROllUP_TYPES_FORKS = "rollup_types_forks"                           // rollup type id -> fork id
+const FORK_HISTORY = "fork_history"                                       // index -> fork id + last verified batch
+const JUST_UNWOUND = "just_unwound"                                       // batch number -> true
+const PLAIN_STATE_VERSION = "plain_state_version"                         // batch number -> true
+const ERIGON_VERSIONS = "erigon_versions"                                 // erigon version -> timestamp of startup
+const DISCARDED_TRANSACTIONS_BY_BLOCK = "discarded_transactions_by_block" // mapping blockNum -> [txHash, ...]
+const DISCARDED_TRANSACTIONS_BY_HASH = "discarded_transactions_by_hash"   // mapping txHash -> blockNum
 
 var HermezDbTables = []string{
 	L1VERIFICATIONS,
@@ -86,13 +88,18 @@ var HermezDbTables = []string{
 	L1_INFO_LEAVES,
 	L1_INFO_ROOTS,
 	INVALID_BATCHES,
-	BATCH_PARTIALLY_PROCESSED,
 	LOCAL_EXIT_ROOTS,
 	ROllUP_TYPES_FORKS,
 	FORK_HISTORY,
 	JUST_UNWOUND,
 	PLAIN_STATE_VERSION,
 	ERIGON_VERSIONS,
+	DISCARDED_TRANSACTIONS_BY_BLOCK,
+	DISCARDED_TRANSACTIONS_BY_HASH,
+}
+
+type TxPoolDiscardReason interface {
+	Value() uint8
 }
 
 type HermezDb struct {
@@ -1723,4 +1730,54 @@ func (db *HermezDb) WriteErigonVersion(version string, timestamp time.Time) (boo
 
 	// write new version
 	return true, db.tx.Put(ERIGON_VERSIONS, []byte(version), Uint64ToBytes(uint64(timestamp.Unix())))
+}
+
+func (db *HermezDb) WriteDiscardedTransaction(blockNum uint64, txHashesWithReason map[common.Hash]uint8) error {
+	if len(txHashesWithReason) == 0 {
+		return nil
+	}
+
+	blockKey := Uint64ToBytes(blockNum)
+	v, err := db.tx.GetOne(DISCARDED_TRANSACTIONS_BY_BLOCK, blockKey)
+	if err != nil {
+		return err
+	}
+
+	for txHash, discardReason := range txHashesWithReason {
+		v = append(v, txHash[:]...)
+		if err = db.tx.Put(DISCARDED_TRANSACTIONS_BY_HASH, txHash[:], Uint8ToBytes(discardReason)); err != nil {
+			return err
+		}
+	}
+
+	return db.tx.Put(DISCARDED_TRANSACTIONS_BY_BLOCK, blockKey, v)
+}
+
+func (db *HermezDb) DeleteDiscardedTransaction(fromBlockNum, toBlockNum uint64) error {
+	for blockNum := fromBlockNum; blockNum <= toBlockNum; blockNum++ {
+		v, err := db.tx.GetOne(DISCARDED_TRANSACTIONS_BY_BLOCK, Uint64ToBytes(blockNum))
+		if err != nil {
+			return err
+		}
+
+		for i := 0; i < len(v); i += length.Hash {
+			txHash := v[i : i+length.Hash]
+			db.tx.Delete(DISCARDED_TRANSACTIONS_BY_HASH, txHash)
+		}
+	}
+
+	return db.deleteFromBucketWithUintKeysRange(DISCARDED_TRANSACTIONS_BY_BLOCK, fromBlockNum, toBlockNum)
+}
+
+func (db *HermezDbReader) GetDiscardedTransactionByHash(txHash *common.Hash) (uint8, error) {
+	v, err := db.tx.GetOne(DISCARDED_TRANSACTIONS_BY_HASH, (*txHash)[:])
+	if err != nil {
+		return 0, err
+	}
+
+	if len(v) != 1 {
+		return 0, nil
+	}
+
+	return BytesToUint8(v), nil
 }

@@ -137,6 +137,10 @@ func UnwindSequenceExecutionStageDbWrites(ctx context.Context, u *stagedsync.Unw
 	if err = hermezDb.DeleteBatchCounters(u.UnwindPoint+1, s.BlockNumber); err != nil {
 		return fmt.Errorf("truncate block batches error: %v", err)
 	}
+	//only seq
+	if err = hermezDb.DeleteDiscardedTransaction(u.UnwindPoint+1, s.BlockNumber); err != nil {
+		return fmt.Errorf("truncate discarded transactions: %v", err)
+	}
 
 	return nil
 }

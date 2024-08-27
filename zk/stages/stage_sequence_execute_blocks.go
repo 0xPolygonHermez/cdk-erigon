@@ -247,6 +247,11 @@ func finaliseBlock(
 		return nil, err
 	}
 
+	// write discarded transactions
+	if err := batchContext.sdb.hermezDb.WriteDiscardedTransaction(newNum.Uint64(), builtBlockElements.getDiscardTransactionsAsUint8Map()); err != nil {
+		return nil, err
+	}
+
 	// this is actually account + storage indices stages
 	quitCh := batchContext.ctx.Done()
 	from := newNum.Uint64()

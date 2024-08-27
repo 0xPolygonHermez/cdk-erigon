@@ -20,6 +20,7 @@ import (
 
 	"github.com/ledgerwatch/erigon/chain"
 	"github.com/ledgerwatch/erigon/zk/hermez_db"
+	"github.com/ledgerwatch/erigon/zk/txpool"
 
 	"github.com/ledgerwatch/erigon/common/hexutil"
 	"github.com/ledgerwatch/erigon/consensus"
@@ -601,6 +602,19 @@ func (api *APIImpl) GetTransactionReceipt(ctx context.Context, txnHash common.Ha
 
 	var blockNum uint64
 	var ok bool
+
+	hermezReader := hermez_db.NewHermezDbReader(tx)
+	discardReasonUint8, err := hermezReader.GetDiscardedTransactionByHash(&txnHash)
+	if err != nil {
+		return nil, err
+	}
+	if discardReasonUint8 != 0 {
+		discardReason := txpool.DiscardReason(discardReasonUint8)
+		fields := map[string]interface{}{
+			"discardReason": discardReason.String(),
+		}
+		return fields, nil
+	}
 
 	blockNum, ok, err = api.txnLookup(ctx, tx, txnHash)
 	if err != nil {

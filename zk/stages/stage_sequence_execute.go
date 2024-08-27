@@ -15,6 +15,7 @@ import (
 	"github.com/ledgerwatch/erigon/eth/stagedsync"
 	"github.com/ledgerwatch/erigon/eth/stagedsync/stages"
 	"github.com/ledgerwatch/erigon/zk"
+	"github.com/ledgerwatch/erigon/zk/txpool"
 	"github.com/ledgerwatch/erigon/zk/utils"
 )
 
@@ -280,6 +281,7 @@ func SpawnSequencingStage(
 							*/
 							if !batchState.hasAnyTransactionsInThisBatch {
 								cfg.txPool.MarkForDiscardFromPendingBest(txHash)
+								batchState.onDiscardTransaction(&txHash, txpool.OverflowZkCounters)
 								log.Trace(fmt.Sprintf("single transaction %s overflow counters", txHash))
 							}
 

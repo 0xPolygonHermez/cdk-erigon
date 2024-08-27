@@ -119,6 +119,10 @@ func (bs *BatchState) onAddedTransaction(transaction types.Transaction, receipt 
 	bs.hasAnyTransactionsInThisBatch = true
 }
 
+func (bs *BatchState) onDiscardTransaction(txHash *common.Hash, discardReason txpool.DiscardReason) {
+	bs.blockState.builtBlockElements.onDiscardTransaction(txHash, discardReason)
+}
+
 func (bs *BatchState) onBuiltBlock(blockNumber uint64) {
 	bs.builtBlocks = append(bs.builtBlocks, blockNumber)
 }
@@ -232,10 +236,11 @@ func (bs *BlockState) getL1EffectiveGases(cfg SequenceBlockCfg, i int) uint8 {
 
 // TYPE BLOCK ELEMENTS
 type BuiltBlockElements struct {
-	transactions     []types.Transaction
-	receipts         types.Receipts
-	effectiveGases   []uint8
-	executionResults []*core.ExecutionResult
+	transactions          []types.Transaction
+	receipts              types.Receipts
+	effectiveGases        []uint8
+	executionResults      []*core.ExecutionResult
+	discardedTransactions map[common.Hash]txpool.DiscardReason
 }
 
 func (bbe *BuiltBlockElements) resetBlockBuildingArrays() {
@@ -243,6 +248,7 @@ func (bbe *BuiltBlockElements) resetBlockBuildingArrays() {
 	bbe.receipts = types.Receipts{}
 	bbe.effectiveGases = []uint8{}
 	bbe.executionResults = []*core.ExecutionResult{}
+	bbe.discardedTransactions = make(map[common.Hash]txpool.DiscardReason)
 }
 
 func (bbe *BuiltBlockElements) onFinishAddingTransaction(transaction types.Transaction, receipt *types.Receipt, execResult *core.ExecutionResult, effectiveGas uint8) {
@@ -250,4 +256,16 @@ func (bbe *BuiltBlockElements) onFinishAddingTransaction(transaction types.Trans
 	bbe.receipts = append(bbe.receipts, receipt)
 	bbe.executionResults = append(bbe.executionResults, execResult)
 	bbe.effectiveGases = append(bbe.effectiveGases, effectiveGas)
+}
+
+func (bbe *BuiltBlockElements) onDiscardTransaction(txHash *common.Hash, discardReason txpool.DiscardReason) {
+	bbe.discardedTransactions[*txHash] = discardReason
+}
+
+func (bbe *BuiltBlockElements) getDiscardTransactionsAsUint8Map() map[common.Hash]uint8 {
+	result := make(map[common.Hash]uint8)
+	for k, v := range bbe.discardedTransactions {
+		result[k] = uint8(v)
+	}
+	return result
 }
