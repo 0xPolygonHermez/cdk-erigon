@@ -2,6 +2,7 @@ package stages
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -9,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gateway-fm/cdk-erigon-lib/common"
-
 	"github.com/gateway-fm/cdk-erigon-lib/kv"
+	jsoncli "github.com/ledgerwatch/erigon/zkevm/jsonrpc/client"
 
 	ethTypes "github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/eth/stagedsync"
@@ -124,6 +125,75 @@ func WithDSClientCreator(handler dsClientCreatorHandler) Option {
 var emptyHash = common.Hash{0}
 
 func SpawnStageBatches(
+	s *stagedsync.StageState,
+	u stagedsync.Unwinder,
+	ctx context.Context,
+	tx kv.RwTx,
+	cfg BatchesCfg,
+	quiet bool,
+) error {
+	var err error
+	for {
+		err = spawnStageBatches(s, u, ctx, tx, cfg, quiet)
+		if checkNeedLoop(ctx, tx, cfg, s.LogPrefix()) {
+			time.Sleep(100 * time.Millisecond)
+			log.Info(fmt.Sprintf("[%s] Loop to continue stage batches", s.LogPrefix()))
+			continue
+		} else {
+			break
+		}
+	}
+
+	return err
+}
+
+func checkNeedLoop(ctx context.Context, tx kv.RwTx, cfg BatchesCfg, logPrefix string) bool {
+	if tx == nil {
+		var err error
+		tx, err = cfg.db.BeginRw(ctx)
+		if err != nil {
+			log.Error(fmt.Sprintf("[%s] Failed to open tx, %v", logPrefix, err))
+			return false
+		}
+		defer tx.Rollback()
+	}
+
+	stageProgressBlockNo, err := stages.GetStageProgress(tx, stages.Batches)
+	if err != nil {
+		log.Error(fmt.Sprintf("[%s] Check need loop, get stage progress error:%v", logPrefix, err))
+		return false
+	}
+
+	res, err := jsoncli.JSONRPCCall(cfg.zkCfg.L2RpcUrl, "eth_blockNumber")
+	if err != nil {
+		log.Error(fmt.Sprintf("[%s] Check need loop, json rpc call error:%v", logPrefix, err))
+		return false
+	}
+	if res.Error != nil {
+		log.Error(fmt.Sprintf("[%s] Check need loop, json rpc call error:%v", logPrefix, res.Error))
+		return false
+	}
+
+	var resultString string
+	if err = json.Unmarshal(res.Result, &resultString); err != nil {
+		log.Error(fmt.Sprintf("[%s] Check need loop, unmarshal error:%v", logPrefix, err))
+		return false
+	}
+
+	block, ok := big.NewInt(0).SetString(resultString[2:], 16)
+	if !ok {
+		log.Error(fmt.Sprintf("[%s] Check need loop, set string error:%v", logPrefix, err))
+		return false
+	}
+
+	if stageProgressBlockNo+1 >= block.Uint64() {
+		return false
+	}
+	log.Info(fmt.Sprintf("[%s] Check need loop, progress block:%v, latest block:%v", logPrefix, stageProgressBlockNo, block.Uint64()))
+	return true
+}
+
+func spawnStageBatches(
 	s *stagedsync.StageState,
 	u stagedsync.Unwinder,
 	ctx context.Context,
@@ -252,17 +322,6 @@ func SpawnStageBatches(
 	lastForkId, err := stages.GetStageProgress(tx, stages.ForkId)
 	if err != nil {
 		return fmt.Errorf("failed to get last fork id, %w", err)
-	}
-
-	stageExecProgress, err := stages.GetStageProgress(tx, stages.Execution)
-	if err != nil {
-		return fmt.Errorf("failed to get stage exec progress, %w", err)
-	}
-
-	// just exit the stage early if there is more execution work to do
-	if stageExecProgress < lastBlockHeight {
-		log.Info(fmt.Sprintf("[%s] Execution behind, skipping stage", logPrefix))
-		return nil
 	}
 
 	lastHash := emptyHash
@@ -469,7 +528,7 @@ LOOP:
 				atLeastOneBlockWritten = true
 				lastBlockHeight = entry.L2BlockNumber
 				blocksWritten++
-				progressChan <- blocksWritten
+				progressChan <- fmt.Sprintf("written count %d, block %d", blocksWritten, lastBlockHeight)
 
 				if endLoop && cfg.zkCfg.DebugLimit > 0 {
 					break LOOP

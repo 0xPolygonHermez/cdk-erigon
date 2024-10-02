@@ -469,7 +469,7 @@ var (
 	RebuildTreeAfterFlag = cli.Uint64Flag{
 		Name:  "zkevm.rebuild-tree-after",
 		Usage: "Rebuild the state tree after this many blocks behind",
-		Value: 10000,
+		Value: 50000,
 	}
 	IncrementTreeAlways = cli.BoolFlag{
 		Name:  "zkevm.increment-tree-always",
