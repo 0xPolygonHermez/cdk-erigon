@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/hex"
 	"math/big"
+	"runtime"
+	"sync"
 
 	ethTypes "github.com/ledgerwatch/erigon/core/types"
-
 	"github.com/ledgerwatch/erigon/smt/pkg/smt"
 	"github.com/ledgerwatch/erigon/smt/pkg/utils"
 	zktx "github.com/ledgerwatch/erigon/zk/tx"
+	"github.com/ledgerwatch/log/v3"
 
 	"github.com/gateway-fm/cdk-erigon-lib/common"
-	"github.com/ledgerwatch/log/v3"
 )
 
 type ExecutedTxInfo struct {
@@ -50,34 +51,40 @@ func BuildBlockInfoTree(
 		"l1BlockHash", l1BlockHash.String(),
 	)
 	var logIndex int64 = 0
+
+	jobs := make(chan TxParserJob, len(*transactionInfos))
+	results := make(chan interface{}, len(*transactionInfos))
+	var wg sync.WaitGroup
+
+	for workerId := 1; workerId <= runtime.NumCPU(); workerId++ {
+		wg.Add(1)
+		go txParserWorker(infoTree, blockNumber, jobs, results, &wg)
+	}
+
 	for i, txInfo := range *transactionInfos {
-		receipt := txInfo.Receipt
-		t := txInfo.Tx
-
-		l2TxHash, err := zktx.ComputeL2TxHash(
-			t.GetChainID().ToBig(),
-			t.GetValue(),
-			t.GetPrice(),
-			t.GetNonce(),
-			t.GetGas(),
-			t.GetTo(),
-			txInfo.Signer,
-			t.GetData(),
-		)
-		if err != nil {
-			return nil, err
+		jobs <- TxParserJob{
+			txIdx:    i,
+			txInfo:   txInfo,
+			logIndex: logIndex,
 		}
 
-		log.Trace("info-tree-tx", "block", blockNumber, "idx", i, "hash", l2TxHash.String())
+		logIndex += int64(len(txInfo.Receipt.Logs))
+	}
+	close(jobs)
 
-		genKeys, genVals, err := infoTree.GenerateBlockTxKeysVals(&l2TxHash, i, receipt, logIndex, receipt.CumulativeGasUsed, txInfo.EffectiveGasPrice)
-		if err != nil {
-			return nil, err
+	wg.Wait()
+	close(results)
+
+	for data := range results {
+		switch data.(type) {
+		case ParsedKeyVals:
+			txKeysVals := data.(ParsedKeyVals)
+			keys = append(keys, txKeysVals.keys...)
+			vals = append(vals, txKeysVals.vals...)
+
+		default:
+			log.Error("not supported data type")
 		}
-		keys = append(keys, genKeys...)
-		vals = append(vals, genVals...)
-
-		logIndex += int64(len(receipt.Logs))
 	}
 
 	key, val, err := generateBlockGasUsed(blockGasUsed)
@@ -353,4 +360,50 @@ func (b *BlockInfoTree) GenerateBlockTxKeysVals(
 	vals = append(vals, val)
 
 	return keys, vals, nil
+}
+
+type TxParserJob struct {
+	txIdx    int
+	txInfo   ExecutedTxInfo
+	logIndex int64
+}
+
+type ParsedKeyVals struct {
+	keys []*utils.NodeKey
+	vals []*utils.NodeValue8
+}
+
+func txParserWorker(infoTree *BlockInfoTree, blockNumber uint64, jobs <-chan TxParserJob, results chan<- interface{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for job := range jobs {
+		receipt := job.txInfo.Receipt
+		t := job.txInfo.Tx
+
+		l2TxHash, err := zktx.ComputeL2TxHash(
+			t.GetChainID().ToBig(),
+			t.GetValue(),
+			t.GetPrice(),
+			t.GetNonce(),
+			t.GetGas(),
+			t.GetTo(),
+			job.txInfo.Signer,
+			t.GetData(),
+		)
+		if err != nil {
+			log.Error("Fail to ComputeL2TxHash", "TxHash", t.Hash(), "error", err)
+		}
+
+		log.Trace("info-tree-tx", "block", blockNumber, "idx", job.txIdx, "hash", l2TxHash.String())
+
+		genKeys, genVals, err := infoTree.GenerateBlockTxKeysVals(&l2TxHash, job.txIdx, receipt, job.logIndex, receipt.CumulativeGasUsed, job.txInfo.EffectiveGasPrice)
+		if err != nil {
+			log.Error("Fail to GenerateBlockTxKeysVals", "TxHash", t.Hash(), "error", err)
+		}
+
+		results <- ParsedKeyVals{
+			keys: genKeys,
+			vals: genVals,
+		}
+	}
 }
