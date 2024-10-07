@@ -48,7 +48,7 @@ type DeprecatedTxPoolConfig struct {
 // DeprecatedDefaultTxPoolConfig contains the default configurations for the transaction
 // pool.
 var DeprecatedDefaultTxPoolConfig = DeprecatedTxPoolConfig{
-	PriceLimit: 1,
+	PriceLimit: 1_000_000_000, // Set default minimum price limit to 1gwei
 	PriceBump:  10,
 
 	AccountSlots:       16,
