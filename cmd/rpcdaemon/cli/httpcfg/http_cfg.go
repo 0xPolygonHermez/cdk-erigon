@@ -76,5 +76,7 @@ type HttpCfg struct {
 	DataStreamWriteTimeout            time.Duration
 	DataStreamInactivityTimeout       time.Duration
 	DataStreamInactivityCheckInterval time.Duration
+	L1RpcUrl                          string
 	L2RpcUrl                          string
+	ChainName                         string
 }
