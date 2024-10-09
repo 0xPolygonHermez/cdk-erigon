@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/ledgerwatch/erigon/cmd/acl/list"
 	"github.com/ledgerwatch/erigon/cmd/acl/mode"
 	"github.com/ledgerwatch/erigon/cmd/acl/update"
 	"github.com/ledgerwatch/erigon/params"
@@ -25,6 +26,7 @@ func main() {
 
 	app.Commands = []*cli.Command{
 		&mode.Command,
+		&list.Command,
 		&update.UpdateCommand,
 		&update.RemoveCommand,
 		&update.AddCommand,

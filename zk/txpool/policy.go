@@ -3,21 +3,28 @@ package txpool
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
+	"fmt"
+	"strings"
 
 	"github.com/ledgerwatch/erigon-lib/common"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon-lib/types"
+	"github.com/ledgerwatch/log/v3"
 )
 
 // Policy is a named policy
 type Policy byte
 
+// when a new Policy is added, it should be added to policiesList also.
 const (
 	// SendTx is the name of the policy that governs that an address may send transactions to pool
 	SendTx Policy = iota
 	// Deploy is the name of the policy that governs that an address may deploy a contract
 	Deploy
 )
+
+var policiesList = []Policy{SendTx, Deploy}
 
 func (p Policy) ToByte() byte {
 	return byte(p)
@@ -51,6 +58,46 @@ func ResolvePolicy(policy string) (Policy, error) {
 // containsPolicy checks if the given policy is present in the policy list
 func containsPolicy(policies []byte, policy Policy) bool {
 	return bytes.Contains(policies, policy.ToByteArray())
+}
+
+// address policyMapping returns a string of user policies.
+func policyMapping(policies []byte, pList []Policy) string {
+	policyPresence := make(map[string]bool)
+
+	for _, policy := range pList {
+		// Check if the policy exists in the provided byte slice
+		exists := bytes.Contains(policies, policy.ToByteArray())
+		if policyName(policy) == "unknown" {
+			continue
+		}
+		// Store the result in the map with the policy name
+		policyPresence[policyName(policy)] = exists
+	}
+
+	// could be used to return a map here
+
+	// Create a slice to hold the formatted policy strings
+	formattedPolicies := make([]string, 0, len(policyPresence))
+
+	// Populate the slice with formatted strings
+	for policy, exists := range policyPresence {
+		formattedPolicies = append(formattedPolicies, fmt.Sprintf("\t%s: %v", policy, exists))
+	}
+
+	// Join the formatted strings with ", "
+	return strings.Join(formattedPolicies, "\n")
+}
+
+// policyName returns the string name of a policy
+func policyName(policy Policy) string {
+	switch policy {
+	case SendTx:
+		return "sendTx"
+	case Deploy:
+		return "deploy"
+	default:
+		return "unknown"
+	}
 }
 
 // DoesAccountHavePolicy checks if the given account has the given policy for the online ACL mode
@@ -207,6 +254,79 @@ func RemovePolicy(ctx context.Context, aclDB kv.RwDB, aclType string, addr commo
 
 		return tx.Put(table, addr.Bytes(), updatedPolicies)
 	})
+}
+
+func ListContentAtACL(ctx context.Context, db kv.RwDB) error {
+
+	var buffer bytes.Buffer
+
+	tables := db.AllTables()
+
+	buffer.WriteString("Tables\nTable - { Flags, AutoDupSortKeysConversion, IsDeprecated, DBI, DupFromLen, DupToLen }")
+	for key, config := range tables {
+		buffer.WriteString(fmt.Sprint(key, config))
+	}
+
+	err := db.View(ctx, func(tx kv.Tx) error {
+		// Config table
+		buffer.WriteString("\nConfig\n")
+		err := tx.ForEach(Config, nil, func(k, v []byte) error {
+			buffer.WriteString(fmt.Sprintf("Key: %s, Value: %s\n", string(k), string(v)))
+			return nil
+		})
+
+		// BlockList table
+		var BlockListContent strings.Builder
+		err = tx.ForEach(BlockList, nil, func(k, v []byte) error {
+			BlockListContent.WriteString(fmt.Sprintf(
+				"Key: %s, Value: {\n%s\n}\n",
+				hex.EncodeToString(k),
+				policyMapping(v, policiesList),
+			))
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if BlockListContent.String() != "" {
+			buffer.WriteString(fmt.Sprintf(
+				"\nBlocklist\n%s",
+				BlockListContent.String(),
+			))
+		} else {
+			buffer.WriteString("\nBlocklist is empty")
+		}
+
+		// Allowlist table
+		var AllowlistContent strings.Builder
+		err = tx.ForEach(Allowlist, nil, func(k, v []byte) error {
+			AllowlistContent.WriteString(fmt.Sprintf(
+				"Key: %s, Value: {\n%s\n}\n",
+				hex.EncodeToString(k),
+				policyMapping(v, policiesList),
+			))
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if AllowlistContent.String() != "" {
+			buffer.WriteString(fmt.Sprintf(
+				"\nAllowlist\n%s",
+				AllowlistContent.String(),
+			))
+		} else {
+			buffer.WriteString("\nAllowlist is empty")
+		}
+
+		return err
+	})
+	if err == nil {
+		fmt.Println(buffer.String())
+		log.Info("ACL content", "content", buffer.String())
+	}
+
+	return err
 }
 
 // SetMode sets the mode of the ACL
