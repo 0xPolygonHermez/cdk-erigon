@@ -125,6 +125,7 @@ import (
 	"github.com/ledgerwatch/erigon/zk/utils"
 	"github.com/ledgerwatch/erigon/zk/witness"
 	"github.com/ledgerwatch/erigon/zkevm/etherman"
+	utilities_mode "github.com/ledgerwatch/erigon/zk/debug_tools/utilities-mode"
 )
 
 // Config contains the configuration options of the ETH protocol.
@@ -895,6 +896,14 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 				witnessGenerator,
 				backend.dataStream,
 			)
+
+			if cfg.Zk.DebugUtilitiesMode {
+				switch cfg.Zk.DebugUtilitiesMethod {
+				case utilities_mode.ModeSequencerExecutorVerifier:
+					sev := utilities_mode.NewSequencerExecutorVerifier(tx, ctx, witnessGenerator, verifier)
+					sev.SequencerExecutorVerify()
+				}
+			}
 
 			if cfg.Zk.Limbo {
 				limboSubPoolProcessor := txpool.NewLimboSubPoolProcessor(ctx, cfg.Zk, backend.chainConfig, backend.chainDB, backend.txPool2, verifier)

@@ -323,6 +323,8 @@ func GetConf() (RpcConfig, error) {
 		return RpcConfig{}, err
 	}
 
+	fmt.Println(string(yamlFile))
+
 	c := RpcConfig{}
 	err = yaml.Unmarshal(yamlFile, &c)
 	if err != nil {
@@ -333,9 +335,11 @@ func GetConf() (RpcConfig, error) {
 }
 
 type RpcConfig struct {
-	Url          string `yaml:"url"`
-	LocalUrl     string `yaml:"localUrl"`
-	Datastream   string `yaml:"datastream"`
-	DumpFileName string `yaml:"dumpFileName"`
-	Block        int64  `yaml:"block"`
+	Url           string `yaml:"url"`
+	LocalUrl      string `yaml:"localUrl"`
+	Datastream    string `yaml:"datastream"`
+	ExecutorUrl   string `yaml:"executorUrl"`
+	DumpFileName  string `yaml:"dumpFileName"`
+	ChainDataPath string `yaml:"chainDataPath"`
+	Block         int64  `yaml:"block"`
 }

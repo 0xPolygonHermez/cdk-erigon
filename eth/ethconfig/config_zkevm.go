@@ -80,6 +80,9 @@ type Zk struct {
 	DebugStep      uint64
 	DebugStepAfter uint64
 
+	DebugUtilitiesMode   bool
+	DebugUtilitiesMethod string
+
 	PoolManagerUrl              string
 	DisableVirtualCounters      bool
 	VirtualCountersSmtReduction float64

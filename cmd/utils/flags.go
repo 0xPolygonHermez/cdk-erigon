@@ -716,6 +716,16 @@ var (
 		Name:  "debug.step-after",
 		Usage: "Start incrementing by debug.step after this block",
 	}
+	DebugUtilitiesMode = cli.BoolFlag{
+		Name:  "debug.utilities-mode",
+		Usage: "Enable utilities mode, allowing the node to be used to run arbitrary code with all dependencies met",
+		Value: false,
+	}
+	DebugUtilitiesMethod = cli.StringFlag{
+		Name:  "debug.utilities-method",
+		Usage: "The method to run in utilities mode",
+		Value: "",
+	}
 	RpcBatchConcurrencyFlag = cli.UintFlag{
 		Name:  "rpc.batch.concurrency",
 		Usage: "Does limit amount of goroutines to process 1 batch request. Means 1 bach request can't overload server. 1 batch still can have unlimited amount of request",
