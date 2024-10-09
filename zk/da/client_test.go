@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gateway-fm/cdk-erigon-lib/common"
 	"github.com/ledgerwatch/erigon/zkevm/jsonrpc/types"
@@ -51,7 +52,7 @@ func TestClient_GetOffChainData(t *testing.T) {
 			name:       "handle retry on 429",
 			hash:       common.BytesToHash([]byte("hash")),
 			statusCode: http.StatusTooManyRequests,
-			err:        "max attempts of data fetching reached",
+			err:        "invalid status code, expected: 200, found: 429",
 		},
 	}
 	for _, tt := range tests {
@@ -78,7 +79,9 @@ func TestClient_GetOffChainData(t *testing.T) {
 			}))
 			defer svr.Close()
 
-			got, err := GetOffChainData(context.Background(), svr.URL, tt.hash)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			got, err := GetOffChainData(ctx, svr.URL, tt.hash)
 			if tt.err != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.err)
