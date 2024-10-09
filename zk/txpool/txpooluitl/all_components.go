@@ -117,6 +117,8 @@ func AllComponents(ctx context.Context, cfg txpoolcfg.Config, ethCfg *ethconfig.
 		return nil, nil, nil, nil, nil, err
 	}
 
+	txpool.ListContentAtACL(ctx, aclDB)
+
 	chainConfig, _, err := SaveChainConfigIfNeed(ctx, chainDB, txPoolDB, true)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err

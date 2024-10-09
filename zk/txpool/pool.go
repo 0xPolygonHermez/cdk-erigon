@@ -523,6 +523,9 @@ func (p *TxPool) OnNewBlock(ctx context.Context, stateChanges *remote.StateChang
 		p.allowYieldingTransactions()
 	}
 
+	// Call to log to check ACL changes
+	ListContentAtACL(ctx, p.aclDB)
+
 	//log.Info("[txpool] new block", "number", p.lastSeenBlock.Load(), "pendngBaseFee", pendingBaseFee, "in", time.Since(t))
 	return nil
 }

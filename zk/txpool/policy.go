@@ -261,10 +261,10 @@ func ListContentAtACL(ctx context.Context, db kv.RwDB) error {
 	var buffer bytes.Buffer
 
 	tables := db.AllTables()
-
-	buffer.WriteString("Tables\nTable - { Flags, AutoDupSortKeysConversion, IsDeprecated, DBI, DupFromLen, DupToLen }")
+	buffer.WriteString("ListContentAtACL\n")
+	buffer.WriteString("Tables\nTable - { Flags, AutoDupSortKeysConversion, IsDeprecated, DBI, DupFromLen, DupToLen }\n")
 	for key, config := range tables {
-		buffer.WriteString(fmt.Sprint(key, config))
+		buffer.WriteString(fmt.Sprint(key, config, "\n"))
 	}
 
 	err := db.View(ctx, func(tx kv.Tx) error {
