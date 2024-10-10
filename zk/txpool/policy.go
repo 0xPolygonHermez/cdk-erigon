@@ -3,15 +3,109 @@ package txpool
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ledgerwatch/erigon-lib/common"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon-lib/types"
+	"github.com/ledgerwatch/erigon/crypto"
 	"github.com/ledgerwatch/log/v3"
 )
+
+// Operation
+type Operation byte
+
+const (
+	Add Operation = iota
+	Remove
+)
+
+func (p Operation) ToByte() byte {
+	return byte(p)
+}
+
+func (p Operation) ToByteArray() []byte {
+	return []byte{byte(p)}
+}
+
+// Convert byte back to Operation
+func OperationFromByte(b byte) Operation {
+	switch b {
+	case byte(Add):
+		return Add
+	case byte(Remove):
+		return Remove
+	default:
+		return Add // Default or error handling can be added here
+	}
+}
+
+// Convert Operation to string
+func (p Operation) String() string {
+	switch p {
+	case Add:
+		return "add"
+	case Remove:
+		return "remove"
+	default:
+		return "unknown operation"
+	}
+}
+
+// ACLType Binary
+type ACLTypeBinary byte
+
+const (
+	AllowListTypeB ACLTypeBinary = iota
+	BlockListTypeB
+)
+
+func (p ACLTypeBinary) ToByte() byte {
+	return byte(p)
+}
+
+func (p ACLTypeBinary) ToByteArray() []byte {
+	return []byte{byte(p)}
+}
+
+// To be used in encoding, avoid in other cases
+func ResolveACLTypeToBinary(aclType string) ACLTypeBinary {
+	switch aclType {
+	case string(AllowListType):
+		return AllowListTypeB
+	case string(BlockListType):
+		return BlockListTypeB
+	}
+	return BlockListTypeB
+}
+
+// Convert byte back to ACLTypeBinary
+func ACLTypeBinaryFromByte(b byte) ACLTypeBinary {
+	switch b {
+	case byte(AllowListTypeB):
+		return AllowListTypeB
+	case byte(BlockListTypeB):
+		return BlockListTypeB
+	default:
+		return BlockListTypeB // Default or error handling can be added here
+	}
+}
+
+// Convert ACLTypeBinary to string
+func (p ACLTypeBinary) String() string {
+	switch p {
+	case AllowListTypeB:
+		return "allowlist"
+	case BlockListTypeB:
+		return "blocklist"
+	default:
+		return "Unknown ACLTypeBinary"
+	}
+}
 
 // Policy is a named policy
 type Policy byte
@@ -188,6 +282,96 @@ func UpdatePolicies(ctx context.Context, aclDB kv.RwDB, aclType string, addrs []
 
 		return nil
 	})
+}
+
+type PolicyTransaction struct {
+	aclType   ACLTypeBinary
+	addr      common.Address //  20 bytes in size
+	policy    Policy
+	operation Operation
+	timeTx    time.Time
+}
+
+// Convert time.Time to bytes (Unix timestamp)
+func timestampToBytes(t time.Time) []byte {
+	unixTime := t.Unix()                              // Get Unix timestamp (seconds since epoch)
+	buf := make([]byte, 8)                            // Allocate 8 bytes for int64
+	binary.BigEndian.PutUint64(buf, uint64(unixTime)) // Store as big-endian bytes
+	return buf
+}
+
+func AddPolicyTransaction(ctx context.Context, aclDB kv.RwDB, pt PolicyTransaction) error {
+	table := "historyTransaction"
+
+	t := pt.timeTx
+	// Convert time.Time to bytes
+	unixBytes := timestampToBytes(t)
+	addressTimestamp := append(pt.addr.Bytes(), unixBytes...)
+	value := append([]byte{pt.aclType.ToByte(), pt.operation.ToByte(), pt.policy.ToByte()}, addressTimestamp...)
+
+	// to be defined the hasing here
+	hashedKey := crypto.Keccak256(addressTimestamp)[:8]
+
+	return aclDB.Update(ctx, func(tx kv.RwTx) error {
+		return tx.Put(table, hashedKey, value)
+	})
+}
+
+// Convert bytes back to time.Time (Unix timestamp)
+func bytesToTimestamp(b []byte) time.Time {
+	if len(b) != 8 {
+		// Handle error, invalid byte slice length
+		return time.Time{}
+	}
+	unixTime := int64(binary.BigEndian.Uint64(b)) // Convert bytes to int64 (Unix timestamp)
+	return time.Unix(unixTime, 0)                 // Convert Unix time to time.Time
+}
+
+func ReadValueFromPolicyTransaction(value []byte) (PolicyTransaction, error) {
+	// Check for expected length:
+	// 1 byte for aclType,
+	// 1 byte for operation,
+	// 1 byte for policy,
+	// 20 bytes for address,
+	// 8 bytes for timestamp = 31 bytes in total
+	if len(value) != 31 {
+		return PolicyTransaction{}, fmt.Errorf("invalid value length %d", len(value))
+	}
+
+	// Extract aclType from the first byte
+	aclType := ACLTypeBinary(value[0])
+
+	// Extract operation from the second byte
+	operation := Operation(value[1])
+
+	// Extract policy from the third byte
+	policy := Policy(value[2])
+
+	// Extract address from the next 20 bytes (3 to 22 inclusive)
+	var addr common.Address
+	copy(addr[:], value[3:23])
+
+	// Extract timestamp from the last 8 bytes (23 to 30 inclusive)
+	timestampBytes := value[23:31]
+	timeTx := bytesToTimestamp(timestampBytes)
+
+	// Return the reconstructed PolicyTransaction struct
+	return PolicyTransaction{
+		aclType:   aclType,
+		addr:      addr,
+		policy:    policy,
+		operation: operation,
+		timeTx:    timeTx,
+	}, nil
+}
+
+func (pt PolicyTransaction) ToString() string {
+	return fmt.Sprintf("ACLType: %s, Address: %s, Policy: %s, Operation: %s, Time: %s",
+		pt.aclType.String(),
+		hex.EncodeToString(pt.addr[:]), // Convert address to hexadecimal string representation
+		policyName(pt.policy),          // Use policyName function to get the policy name
+		pt.operation.String(),
+		pt.timeTx.Format(time.RFC3339)) // Use RFC3339 format for the time
 }
 
 // AddPolicy adds a policy to the ACL of given address

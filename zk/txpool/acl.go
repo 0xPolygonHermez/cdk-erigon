@@ -96,6 +96,7 @@ var (
 	errUnsupportedACLType = errors.New("unsupported acl type")
 	errUnknownACLTable    = errors.New("unknown acl table")
 	errUnknownPolicy      = errors.New("unknown policy")
+	errWrongOperation     = errors.New("wrong operation")
 )
 
 const ACLDB kv.Label = 255
