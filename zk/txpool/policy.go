@@ -300,7 +300,7 @@ func timestampToBytes(t time.Time) []byte {
 	return buf
 }
 
-func AddPolicyTransaction(ctx context.Context, aclDB kv.RwDB, pt PolicyTransaction) error {
+func InsertPolicyTransaction(ctx context.Context, aclDB kv.RwDB, pt PolicyTransaction) error {
 	table := "historyTransaction"
 
 	t := pt.timeTx
@@ -312,6 +312,7 @@ func AddPolicyTransaction(ctx context.Context, aclDB kv.RwDB, pt PolicyTransacti
 	// to be defined the hasing here
 	hashedKey := crypto.Keccak256(addressTimestamp)[:8]
 
+	// TODO keep the last 10, in an byte array, every 31 bytes is a transaction
 	return aclDB.Update(ctx, func(tx kv.RwTx) error {
 		return tx.Put(table, hashedKey, value)
 	})
@@ -385,7 +386,7 @@ func AddPolicy(ctx context.Context, aclDB kv.RwDB, aclType string, addr common.A
 		return err
 	}
 
-	return aclDB.Update(ctx, func(tx kv.RwTx) error {
+	err = aclDB.Update(ctx, func(tx kv.RwTx) error {
 		value, err := tx.GetOne(table, addr.Bytes())
 		if err != nil {
 			return err
@@ -405,6 +406,19 @@ func AddPolicy(ctx context.Context, aclDB kv.RwDB, aclType string, addr common.A
 
 		return tx.Put(table, addr.Bytes(), value)
 	})
+	if err != nil {
+		return err
+	}
+
+	err = InsertPolicyTransaction(ctx, aclDB, PolicyTransaction{
+		aclType:   ResolveACLTypeToBinary(aclType),
+		addr:      addr,
+		policy:    policy,
+		operation: Add,
+		timeTx:    time.Now(),
+	})
+
+	return err
 }
 
 // RemovePolicy removes a policy from the ACL of given address
@@ -414,7 +428,7 @@ func RemovePolicy(ctx context.Context, aclDB kv.RwDB, aclType string, addr commo
 		return err
 	}
 
-	return aclDB.Update(ctx, func(tx kv.RwTx) error {
+	err = aclDB.Update(ctx, func(tx kv.RwTx) error {
 		policies, err := tx.GetOne(table, addr.Bytes())
 		if err != nil {
 			return err
@@ -438,6 +452,19 @@ func RemovePolicy(ctx context.Context, aclDB kv.RwDB, aclType string, addr commo
 
 		return tx.Put(table, addr.Bytes(), updatedPolicies)
 	})
+	if err != nil {
+		return err
+	}
+
+	err = InsertPolicyTransaction(ctx, aclDB, PolicyTransaction{
+		aclType:   ResolveACLTypeToBinary(aclType),
+		addr:      addr,
+		policy:    policy,
+		operation: Remove,
+		timeTx:    time.Now(),
+	})
+
+	return err
 }
 
 func ListContentAtACL(ctx context.Context, db kv.RwDB) error {
