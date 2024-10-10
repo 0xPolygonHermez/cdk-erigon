@@ -24,6 +24,7 @@ type Operation byte
 const (
 	Add Operation = iota
 	Remove
+	Update
 )
 
 func (p Operation) ToByte() byte {
@@ -41,6 +42,8 @@ func OperationFromByte(b byte) Operation {
 		return Add
 	case byte(Remove):
 		return Remove
+	case byte(Update):
+		return Update
 	default:
 		return Add // Default or error handling can be added here
 	}
@@ -53,6 +56,8 @@ func (p Operation) String() string {
 		return "add"
 	case Remove:
 		return "remove"
+	case Update:
+		return "update"
 	default:
 		return "unknown operation"
 	}
@@ -254,7 +259,6 @@ func checkIfAccountHasPolicy(ctx context.Context, aclDB kv.RwDB, addr common.Add
 }
 
 // UpdatePolicies sets a policy for an address
-// TODO check this arthur.
 func UpdatePolicies(ctx context.Context, aclDB kv.RwDB, aclType string, addrs []common.Address, policies [][]Policy) error {
 	table, err := resolveTable(aclType)
 	if err != nil {
@@ -263,17 +267,29 @@ func UpdatePolicies(ctx context.Context, aclDB kv.RwDB, aclType string, addrs []
 
 	return aclDB.Update(ctx, func(tx kv.RwTx) error {
 		for i, addr := range addrs {
+
+			// Insert policy transaction for adding or updating the policy
+			// I'm omiting the policies in this case.
+			err := InsertPolicyTransaction(ctx, aclDB, PolicyTransaction{
+				aclType:   ResolveACLTypeToBinary(aclType),
+				addr:      addr,
+				operation: Update,
+				timeTx:    time.Now(),
+			})
+			if err != nil {
+				return err
+			}
+
 			if len(policies[i]) > 0 {
 				// just update the policies for the address to match the one provided
 				policyBytes := make([]byte, 0, len(policies[i]))
 				for _, p := range policies[i] {
 					policyBytes = append(policyBytes, p.ToByte())
 				}
-
+				// Update the policies in the table
 				if err := tx.Put(table, addr.Bytes(), policyBytes); err != nil {
 					return err
 				}
-
 				continue
 			}
 
