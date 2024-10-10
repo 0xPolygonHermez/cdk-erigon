@@ -34,7 +34,7 @@ func run(cliCtx *cli.Context) error {
 		return nil
 	}
 	for i, pt := range pts {
-		log.Info("Policy transaction - ", "index:", i, "pt:", pt)
+		log.Info("Policy transaction - ", "index:", i, "pt:", pt.ToString())
 	}
 
 	return nil

@@ -288,8 +288,8 @@ func UpdatePolicies(ctx context.Context, aclDB kv.RwDB, aclType string, addrs []
 }
 
 type PolicyTransaction struct {
-	aclType   ACLTypeBinary
 	addr      common.Address //  20 bytes in size
+	aclType   ACLTypeBinary
 	policy    Policy
 	operation Operation
 	timeTx    time.Time
@@ -304,8 +304,6 @@ func timestampToBytes(t time.Time) []byte {
 }
 
 func InsertPolicyTransaction(ctx context.Context, aclDB kv.RwDB, pt PolicyTransaction) error {
-	table := "historyTransaction"
-
 	t := pt.timeTx
 	// Convert time.Time to bytes
 	unixBytes := timestampToBytes(t)
@@ -314,7 +312,7 @@ func InsertPolicyTransaction(ctx context.Context, aclDB kv.RwDB, pt PolicyTransa
 	value := append([]byte{pt.aclType.ToByte(), pt.operation.ToByte(), pt.policy.ToByte()}, addressTimestamp...)
 
 	return aclDB.Update(ctx, func(tx kv.RwTx) error {
-		return tx.Put(table, addressTimestamp, value)
+		return tx.Put(PolicyTransactions, addressTimestamp, value)
 	})
 }
 
