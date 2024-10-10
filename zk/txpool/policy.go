@@ -12,8 +12,10 @@ import (
 	"github.com/ledgerwatch/erigon-lib/common"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon-lib/types"
-	"github.com/ledgerwatch/erigon/crypto"
-	"github.com/ledgerwatch/log/v3"
+)
+
+const (
+	logCountPolicyTransactions = "log_count_output" // config variable name
 )
 
 // Operation
@@ -252,6 +254,7 @@ func checkIfAccountHasPolicy(ctx context.Context, aclDB kv.RwDB, addr common.Add
 }
 
 // UpdatePolicies sets a policy for an address
+// TODO check this arthur.
 func UpdatePolicies(ctx context.Context, aclDB kv.RwDB, aclType string, addrs []common.Address, policies [][]Policy) error {
 	table, err := resolveTable(aclType)
 	if err != nil {
@@ -306,15 +309,12 @@ func InsertPolicyTransaction(ctx context.Context, aclDB kv.RwDB, pt PolicyTransa
 	t := pt.timeTx
 	// Convert time.Time to bytes
 	unixBytes := timestampToBytes(t)
+	// composite key.
 	addressTimestamp := append(pt.addr.Bytes(), unixBytes...)
 	value := append([]byte{pt.aclType.ToByte(), pt.operation.ToByte(), pt.policy.ToByte()}, addressTimestamp...)
 
-	// to be defined the hasing here
-	hashedKey := crypto.Keccak256(addressTimestamp)[:8]
-
-	// TODO keep the last 10, in an byte array, every 31 bytes is a transaction
 	return aclDB.Update(ctx, func(tx kv.RwTx) error {
-		return tx.Put(table, hashedKey, value)
+		return tx.Put(table, addressTimestamp, value)
 	})
 }
 
@@ -328,7 +328,64 @@ func bytesToTimestamp(b []byte) time.Time {
 	return time.Unix(unixTime, 0)                 // Convert Unix time to time.Time
 }
 
-func ReadValueFromPolicyTransaction(value []byte) (PolicyTransaction, error) {
+// LastPolicyTransactions returns the last n policy transactions, defined by logCountPolicyTransactions config variable
+func LastPolicyTransactions(ctx context.Context, aclDB kv.RwDB) ([]PolicyTransaction, error) {
+
+	var logOutputcount int = 10
+	err := aclDB.View(ctx, func(tx kv.Tx) error {
+		value, err := tx.GetOne(Config, []byte(logCountPolicyTransactions))
+		if err != nil {
+			return err
+		}
+		if len(value) == 0 {
+			return nil
+		}
+		logOutputcount = int(binary.BigEndian.Uint64(value))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var pts []PolicyTransaction
+	err = aclDB.View(ctx, func(tx kv.Tx) error {
+		c, err := tx.Cursor(PolicyTransactions)
+		if err != nil {
+			return err
+		}
+		defer c.Close()
+		// get the last
+		_, value, err := c.Last()
+		if err != nil {
+			return err
+		}
+
+		pt, err := byteToPolicyTransaction(value)
+		if err != nil {
+			return err
+		}
+		pts = append(pts, pt)
+
+		// do this 9 times.
+		for i := 0; i < logOutputcount; i++ {
+			_, value, err = c.Prev()
+			if err != nil {
+				return err
+			}
+
+			pt, err := byteToPolicyTransaction(value)
+			if err != nil {
+				return err
+			}
+			pts = append(pts, pt)
+		}
+		return nil
+	})
+
+	return pts, err
+}
+
+func byteToPolicyTransaction(value []byte) (PolicyTransaction, error) {
 	// Check for expected length:
 	// 1 byte for aclType,
 	// 1 byte for operation,
@@ -467,7 +524,7 @@ func RemovePolicy(ctx context.Context, aclDB kv.RwDB, aclType string, addr commo
 	return err
 }
 
-func ListContentAtACL(ctx context.Context, db kv.RwDB) error {
+func ListContentAtACL(ctx context.Context, db kv.RwDB) (string, error) {
 
 	var buffer bytes.Buffer
 
@@ -532,12 +589,8 @@ func ListContentAtACL(ctx context.Context, db kv.RwDB) error {
 
 		return err
 	})
-	if err == nil {
-		fmt.Println(buffer.String())
-		log.Info("ACL content", "content", buffer.String())
-	}
 
-	return err
+	return buffer.String(), err
 }
 
 // SetMode sets the mode of the ACL

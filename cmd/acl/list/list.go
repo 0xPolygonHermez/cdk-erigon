@@ -1,11 +1,9 @@
 package list
 
 import (
-	"fmt"
-
 	"github.com/ledgerwatch/erigon/cmd/utils"
 	"github.com/ledgerwatch/erigon/zk/txpool"
-	"github.com/ledgerwatch/log/v3"
+	"github.com/ledgerwatch/erigon/zkevm/log"
 	"github.com/urfave/cli/v2"
 )
 
@@ -19,10 +17,8 @@ var Command = cli.Command{
 }
 
 func run(cliCtx *cli.Context) error {
-
 	dataDir := cliCtx.String(utils.DataDirFlag.Name)
-	fmt.Println("Listing ", "dataDir:", dataDir)
-	log.Info("at ACL listing command")
+	log.Info("Listing ", "dataDir:", dataDir)
 
 	aclDB, err := txpool.OpenACLDB(cliCtx.Context, dataDir)
 	if err != nil {
@@ -30,7 +26,16 @@ func run(cliCtx *cli.Context) error {
 		return err
 	}
 
-	txpool.ListContentAtACL(cliCtx.Context, aclDB)
+	content, _ := txpool.ListContentAtACL(cliCtx.Context, aclDB)
+	log.Info(content)
+	pts, _ := txpool.LastPolicyTransactions(cliCtx.Context, aclDB)
+	if len(pts) == 0 {
+		log.Info("No policy transactions found")
+		return nil
+	}
+	for i, pt := range pts {
+		log.Info("Policy transaction - ", "index:", i, "pt:", pt)
+	}
 
 	return nil
 }
