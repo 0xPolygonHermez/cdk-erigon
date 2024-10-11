@@ -628,6 +628,15 @@ func SetMode(ctx context.Context, aclDB kv.RwDB, mode string) error {
 	})
 }
 
+// SetLogCount sets the mode of the ACL
+func SetLogCount(ctx context.Context, aclDB kv.RwDB, logCount int) error {
+	return aclDB.Update(ctx, func(tx kv.RwTx) error {
+		logCountBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(logCountBytes, uint64(logCount))
+		return tx.Put(Config, []byte(logCountPolicyTransactions), logCountBytes)
+	})
+}
+
 // GetMode gets the mode of the ACL
 func GetMode(ctx context.Context, aclDB kv.RwDB) (ACLMode, error) {
 	var mode ACLMode
