@@ -264,21 +264,18 @@ func UpdatePolicies(ctx context.Context, aclDB kv.RwDB, aclType string, addrs []
 	if err != nil {
 		return err
 	}
-
-	return aclDB.Update(ctx, func(tx kv.RwTx) error {
+	// Create an array to hold policy transactions
+	var policyTransactions []PolicyTransaction
+	timeNow := time.Now()
+	err = aclDB.Update(ctx, func(tx kv.RwTx) error {
 		for i, addr := range addrs {
-
-			// Insert policy transaction for adding or updating the policy
-			// I'm omiting the policies in this case.
-			err := InsertPolicyTransaction(ctx, aclDB, PolicyTransaction{
+			// Add the policy transaction to the array
+			policyTransactions = append(policyTransactions, PolicyTransaction{
 				aclType:   ResolveACLTypeToBinary(aclType),
 				addr:      addr,
 				operation: Update,
-				timeTx:    time.Now(),
+				timeTx:    timeNow,
 			})
-			if err != nil {
-				return err
-			}
 
 			if len(policies[i]) > 0 {
 				// just update the policies for the address to match the one provided
@@ -301,6 +298,13 @@ func UpdatePolicies(ctx context.Context, aclDB kv.RwDB, aclType string, addrs []
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Insert policy transaction for adding or updating the policy
+	// I'm omiting the policies in this case.
+	return InsertPolicyTransactions(ctx, aclDB, policyTransactions)
 }
 
 type PolicyTransaction struct {
@@ -319,16 +323,21 @@ func timestampToBytes(t time.Time) []byte {
 	return buf
 }
 
-func InsertPolicyTransaction(ctx context.Context, aclDB kv.RwDB, pt PolicyTransaction) error {
-	t := pt.timeTx
-	// Convert time.Time to bytes
-	unixBytes := timestampToBytes(t)
-	// composite key.
-	addressTimestamp := append(pt.addr.Bytes(), unixBytes...)
-	value := append([]byte{pt.aclType.ToByte(), pt.operation.ToByte(), pt.policy.ToByte()}, addressTimestamp...)
-
+func InsertPolicyTransactions(ctx context.Context, aclDB kv.RwDB, pts []PolicyTransaction) error {
 	return aclDB.Update(ctx, func(tx kv.RwTx) error {
-		return tx.Put(PolicyTransactions, addressTimestamp, value)
+		for _, pt := range pts {
+			t := pt.timeTx
+			// Convert time.Time to bytes
+			unixBytes := timestampToBytes(t)
+			// composite key.
+			addressTimestamp := append(pt.addr.Bytes(), unixBytes...)
+			value := append([]byte{pt.aclType.ToByte(), pt.operation.ToByte(), pt.policy.ToByte()}, addressTimestamp...)
+
+			if err := tx.Put(PolicyTransactions, addressTimestamp, value); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -481,13 +490,13 @@ func AddPolicy(ctx context.Context, aclDB kv.RwDB, aclType string, addr common.A
 		return err
 	}
 
-	err = InsertPolicyTransaction(ctx, aclDB, PolicyTransaction{
+	err = InsertPolicyTransactions(ctx, aclDB, []PolicyTransaction{{
 		aclType:   ResolveACLTypeToBinary(aclType),
 		addr:      addr,
 		policy:    policy,
 		operation: Add,
 		timeTx:    time.Now(),
-	})
+	}})
 
 	return err
 }
@@ -527,13 +536,13 @@ func RemovePolicy(ctx context.Context, aclDB kv.RwDB, aclType string, addr commo
 		return err
 	}
 
-	err = InsertPolicyTransaction(ctx, aclDB, PolicyTransaction{
+	err = InsertPolicyTransactions(ctx, aclDB, []PolicyTransaction{{
 		aclType:   ResolveACLTypeToBinary(aclType),
 		addr:      addr,
 		policy:    policy,
 		operation: Remove,
 		timeTx:    time.Now(),
-	})
+	}})
 
 	return err
 }
