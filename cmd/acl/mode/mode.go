@@ -11,7 +11,7 @@ import (
 
 var (
 	mode           string // Mode of the ACL
-	logCountOutput int    // Output for log count
+	logCountOutput string // Output for log count
 )
 
 var Command = cli.Command{
@@ -25,7 +25,7 @@ var Command = cli.Command{
 			Usage:       "Mode of the ACL (allowlist, blocklist or disabled)",
 			Destination: &mode,
 		},
-		&cli.IntFlag{
+		&cli.StringFlag{
 			Name:        "log_count",
 			Usage:       "Number of transactions at startup to log",
 			Destination: &logCountOutput,

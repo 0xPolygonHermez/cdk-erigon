@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -363,7 +364,12 @@ func LastPolicyTransactions(ctx context.Context, aclDB kv.RwDB) ([]PolicyTransac
 		if len(value) == 0 {
 			return nil
 		}
-		logOutputcount = int(binary.BigEndian.Uint64(value))
+
+		logOutputcountStr := string(value)
+		logOutputcount, err = strconv.Atoi(logOutputcountStr)
+		if err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
@@ -629,11 +635,15 @@ func SetMode(ctx context.Context, aclDB kv.RwDB, mode string) error {
 }
 
 // SetLogCount sets the mode of the ACL
-func SetLogCount(ctx context.Context, aclDB kv.RwDB, logCount int) error {
+func SetLogCount(ctx context.Context, aclDB kv.RwDB, logCount string) error {
+
+	_, err := strconv.Atoi(logCount)
+	if err != nil {
+		return fmt.Errorf("invalid log count, nan: %s", logCount)
+	}
+
 	return aclDB.Update(ctx, func(tx kv.RwTx) error {
-		logCountBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(logCountBytes, uint64(logCount))
-		return tx.Put(Config, []byte(logCountPolicyTransactions), logCountBytes)
+		return tx.Put(Config, []byte(logCountPolicyTransactions), []byte(logCount))
 	})
 }
 
