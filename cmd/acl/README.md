@@ -32,7 +32,7 @@ Examples on how to setup your data-dir
 This command takes the following form: 
 
 ```shell
-    acl mode --datadir=<data-dir> --mode=<mode>
+    acl mode --datadir=<data-dir> --mode=<mode> --log_count=<number_integer>[optional]
 ```
 
 ## supported ACL Types
@@ -100,5 +100,5 @@ The `remove` command will remove the given policy from an account in given acces
     acl add --address=0x0921598333Cf3cE5FE2031C056C79aec59EE10b6 --policy=sendTx --type=allowlist --datadir=/Users/username_pc_mac/path_to_data/erigon-data/devnet/txpool
     acl remove --address=0x0921598333Cf3cE5FE2031C056C79aec59EE10b6 --policy=sendTx --type=allowlist --datadir=/Users/username_pc_mac/path_to_data/erigon-data/devnet/txpool
 
-    acl mode --mode=disabled --datadir=/Users/username_pc_mac/path_to_data/erigon-data/devnet/txpool
+    acl mode --mode=disabled --datadir=/Users/username_pc_mac/path_to_data/erigon-data/devnet/txpool --log_count=20
 ```
