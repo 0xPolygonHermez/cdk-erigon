@@ -642,6 +642,11 @@ var (
 		Usage: "Define the inactivity check interval timeout when interacting with a data stream server",
 		Value: 5 * time.Minute,
 	}
+	DataStreamTruncateBlock = cli.Uint64Flag{
+		Name:  "zkevm.data-stream-truncate-block",
+		Usage: "Define a specific block number to truncate the data stream",
+		Value: 0,
+	}
 	Limbo = cli.BoolFlag{
 		Name:  "zkevm.limbo",
 		Usage: "Enable limbo processing on batches that failed verification",

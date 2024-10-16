@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ledgerwatch/erigon-lib/chain"
 	libcommon "github.com/ledgerwatch/erigon-lib/common"
@@ -226,4 +227,11 @@ func CalculateBatchData(batchBlockData []BatchBlockData) (batchL2Data []byte, er
 	}
 
 	return batchL2Data, err
+}
+
+func HaltNode(err error) {
+	log.Error(fmt.Sprintf("Halting node, fatal error: %v", err))
+	for {
+		time.Sleep(1 * time.Second) //nolint:gomnd
+	}
 }

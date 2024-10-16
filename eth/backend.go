@@ -146,7 +146,8 @@ import (
 type Config = ethconfig.Config
 
 type PreStartTasks struct {
-	WarmUpDataStream bool
+	WarmUpDataStream   bool
+	TruncateDataStream bool
 }
 
 // Ethereum implements the Ethereum full node service.
@@ -990,6 +991,12 @@ func New(ctx context.Context, stack *node.Node, config *ethconfig.Config, logger
 				log.Info("[dataStream] setting the stream progress to 0")
 				backend.preStartTasks.WarmUpDataStream = true
 			}
+
+			if backend.config.Zk.DataStreamTruncateBlock != 0 {
+				log.Warn(fmt.Sprintf("[stream-truncate] setting the stream truncated progress"))
+				backend.preStartTasks.TruncateDataStream = true
+				backend.preStartTasks.WarmUpDataStream = true
+			}
 		}
 
 		// entering ZK territory!
@@ -1376,6 +1383,38 @@ func (s *Ethereum) Init(stack *node.Node, config *ethconfig.Config, chainConfig 
 }
 
 func (s *Ethereum) PreStart() error {
+	if s.preStartTasks.TruncateDataStream {
+		log.Info("[PreStart] truncate data stream")
+		tx, err := s.chainDB.BeginRw(context.Background())
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+
+		// we don't know when the server has actually started as it doesn't expose a signal that is has spun up
+		// so here we loop and take a brief pause waiting for it to be ready
+		attempts := 0
+		for {
+			err = zkStages.TruncateDatastream("stream-truncate", tx, s.dataStream, s.chainConfig.ChainID.Uint64(), s.config.DatastreamVersion, s.config.DataStreamTruncateBlock)
+			if err != nil {
+				if errors.Is(err, datastreamer.ErrAtomicOpNotAllowed) {
+					attempts++
+					if attempts == 10 {
+						return err
+					}
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+				return err
+			} else {
+				break
+			}
+		}
+		if err = tx.Commit(); err != nil {
+			return err
+		}
+	}
+
 	if s.preStartTasks.WarmUpDataStream {
 		log.Info("[PreStart] warming up data stream")
 		tx, err := s.chainDB.BeginRw(context.Background())
