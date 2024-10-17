@@ -86,6 +86,8 @@ type Zk struct {
 	ExecutorPayloadOutput       string
 
 	TxPoolRejectSmartContractDeployments bool
+
+	InitialBatchCfgFile string
 }
 
 var DefaultZkConfig = &Zk{}
@@ -96,4 +98,9 @@ func (c *Zk) ShouldCountersBeUnlimited(l1Recovery bool) bool {
 
 func (c *Zk) HasExecutors() bool {
 	return len(c.ExecutorUrls) > 0 && c.ExecutorUrls[0] != ""
+}
+
+// ShouldImportInitialBatch returns true in case initial batch config file name is non-empty string.
+func (c *Zk) ShouldImportInitialBatch() bool {
+	return c.InitialBatchCfgFile != ""
 }
