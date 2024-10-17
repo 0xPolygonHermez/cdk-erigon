@@ -1,16 +1,18 @@
 package client
 
-import "fmt"
+import (
+	"fmt"
+)
 
 const (
 	// Commands
-	CmdUnknown       Command = 0
-	CmdStart         Command = 1
-	CmdStop          Command = 2
-	CmdHeader        Command = 3
-	CmdStartBookmark Command = 4 // CmdStartBookmark for the start from bookmark TCP client command
-	CmdEntry         Command = 5 // CmdEntry for the get entry TCP client command
-	CmdBookmark      Command = 6 // CmdBookmark for the get bookmark TCP client command
+	CmdUnknown Command = iota
+	CmdStart
+	CmdStop
+	CmdHeader
+	CmdStartBookmark // CmdStartBookmark for the start from bookmark TCP client command
+	CmdEntry         // CmdEntry for the get entry TCP client command
+	CmdBookmark      // CmdBookmark for the get bookmark TCP client command
 )
 
 // sendHeaderCmd sends the header command to the server.
@@ -38,12 +40,12 @@ func (c *StreamClient) sendBookmarkCmd(bookmark []byte, streaming bool) error {
 	}
 
 	// Send bookmark length
-	if err := writeFullUint32ToConn(c.conn, uint32(len(bookmark))); err != nil {
+	if err := c.writeToConn(uint32(len(bookmark))); err != nil {
 		return err
 	}
 
 	// Send the bookmark to retrieve
-	return writeBytesToConn(c.conn, bookmark)
+	return c.writeToConn(bookmark)
 }
 
 // sendStartCmd sends a start command to the server, indicating
@@ -55,7 +57,7 @@ func (c *StreamClient) sendStartCmd(from uint64) error {
 	}
 
 	// Send starting/from entry number
-	return writeFullUint64ToConn(c.conn, from)
+	return c.writeToConn(from)
 }
 
 // sendEntryCmd sends the get data stream entry by number command to a TCP connection
@@ -66,7 +68,7 @@ func (c *StreamClient) sendEntryCmd(entryNum uint64) error {
 	}
 
 	// Send entry number
-	return writeFullUint64ToConn(c.conn, entryNum)
+	return c.writeToConn(entryNum)
 }
 
 // sendHeaderCmd sends the header command to the server.
@@ -80,13 +82,14 @@ func (c *StreamClient) sendStopCmd() error {
 }
 
 func (c *StreamClient) sendCommand(cmd Command) error {
+
 	// Send command
-	if err := writeFullUint64ToConn(c.conn, uint64(cmd)); err != nil {
+	if err := c.writeToConn(uint64(cmd)); err != nil {
 		return fmt.Errorf("%s %v", c.id, err)
 	}
 
 	// Send stream type
-	if err := writeFullUint64ToConn(c.conn, uint64(c.streamType)); err != nil {
+	if err := c.writeToConn(uint64(c.streamType)); err != nil {
 		return fmt.Errorf("%s %v", c.id, err)
 	}
 

@@ -11,6 +11,7 @@ type TestDatastreamClient struct {
 	gerUpdates            []types.GerUpdate
 	lastWrittenTimeAtomic atomic.Int64
 	streamingAtomic       atomic.Bool
+	stopReadingToChannel  atomic.Bool
 	progress              atomic.Uint64
 	entriesChan           chan interface{}
 	errChan               chan error
@@ -28,10 +29,6 @@ func NewTestDatastreamClient(fullL2Blocks []types.FullL2Block, gerUpdates []type
 	return client
 }
 
-func (c *TestDatastreamClient) EnsureConnected() (bool, error) {
-	return true, nil
-}
-
 func (c *TestDatastreamClient) ReadAllEntriesToChannel() error {
 	c.streamingAtomic.Store(true)
 	defer c.streamingAtomic.Swap(false)
@@ -43,7 +40,20 @@ func (c *TestDatastreamClient) ReadAllEntriesToChannel() error {
 		c.entriesChan <- &c.gerUpdates[i]
 	}
 
+	for {
+		if c.stopReadingToChannel.Load() {
+			break
+		}
+	}
+
 	return nil
+}
+
+func (c *TestDatastreamClient) RenewEntryChannel() {
+}
+
+func (c *TestDatastreamClient) StopReadingToChannel() {
+	c.stopReadingToChannel.Store(true)
 }
 
 func (c *TestDatastreamClient) GetEntryChan() *chan interface{} {

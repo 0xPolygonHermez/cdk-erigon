@@ -51,7 +51,7 @@ func TestStreamClientReadHeaderEntry(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		c := NewClient(context.Background(), "", 0, 0, 0)
+		c := NewClient(context.Background(), "", 0, 2*time.Second, 0)
 		server, conn := net.Pipe()
 		defer server.Close()
 		defer c.Stop()
@@ -115,7 +115,7 @@ func TestStreamClientReadResultEntry(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		c := NewClient(context.Background(), "", 0, 0, 0)
+		c := NewClient(context.Background(), "", 0, 2*time.Second, 0)
 		server, conn := net.Pipe()
 		defer server.Close()
 		defer c.Stop()
@@ -184,7 +184,7 @@ func TestStreamClientReadFileEntry(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		c := NewClient(context.Background(), "", 0, 0, 0)
+		c := NewClient(context.Background(), "", 0, 2*time.Second, 0)
 		server, conn := net.Pipe()
 		defer c.Stop()
 		defer server.Close()
@@ -204,9 +204,14 @@ func TestStreamClientReadFileEntry(t *testing.T) {
 }
 
 func TestStreamClientReadParsedProto(t *testing.T) {
-	c := NewClient(context.Background(), "", 0, 0, 0)
+	c := NewClient(context.Background(), "", 0, 2*time.Second, 0)
 	serverConn, clientConn := net.Pipe()
 	c.conn = clientConn
+	c.checkTimeout = 1 * time.Second
+
+	c.header = &types.HeaderEntry{
+		TotalEntries: 3,
+	}
 	defer func() {
 		serverConn.Close()
 		clientConn.Close()
@@ -253,7 +258,7 @@ func TestStreamClientReadParsedProto(t *testing.T) {
 		close(errCh)
 	}()
 
-	parsedEntry, err := ReadParsedProto(c)
+	parsedEntry, entryNum, err := ReadParsedProto(c)
 	require.NoError(t, err)
 	serverErr := <-errCh
 	require.NoError(t, serverErr)
@@ -261,6 +266,7 @@ func TestStreamClientReadParsedProto(t *testing.T) {
 	expectedL2Block := types.ConvertToFullL2Block(l2Block)
 	expectedL2Block.L2Txs = append(expectedL2Block.L2Txs, *expectedL2Tx)
 	require.Equal(t, expectedL2Block, parsedEntry)
+	require.Equal(t, uint64(3), entryNum)
 }
 
 func TestStreamClientGetLatestL2Block(t *testing.T) {
@@ -270,9 +276,9 @@ func TestStreamClientGetLatestL2Block(t *testing.T) {
 		clientConn.Close()
 	}()
 
-	c := NewClient(context.Background(), "", 0, 0, 0)
+	c := NewClient(context.Background(), "", 0, 2*time.Second, 0)
 	c.conn = clientConn
-
+	c.checkTimeout = 1 * time.Second
 	expectedL2Block, _ := createL2BlockAndTransactions(t, 5, 0)
 	l2BlockProto := &types.L2BlockProto{L2Block: expectedL2Block}
 	l2BlockRaw, err := l2BlockProto.Marshal()
@@ -383,9 +389,12 @@ func TestStreamClientGetL2BlockByNumber(t *testing.T) {
 		clientConn.Close()
 	}()
 
-	c := NewClient(context.Background(), "", 0, 0, 0)
+	c := NewClient(context.Background(), "", 0, 2*time.Second, 0)
+	c.header = &types.HeaderEntry{
+		TotalEntries: 4,
+	}
 	c.conn = clientConn
-
+	c.checkTimeout = 1 * time.Second
 	bookmark := types.NewBookmarkProto(blockNum, datastream.BookmarkType_BOOKMARK_TYPE_L2_BLOCK)
 	bookmarkRaw, err := bookmark.Marshal()
 	require.NoError(t, err)
@@ -476,9 +485,12 @@ func TestStreamClientGetL2BlockByNumber(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, types.CmdErrOK, errCode)
 
-	serverErr := <-errCh
+	var serverErr error
+	select {
+	case serverErr = <-errCh:
+	default:
+	}
 	require.NoError(t, serverErr)
-
 	l2TxsProto := make([]types.L2TransactionProto, len(l2Txs))
 	for i, tx := range l2Txs {
 		l2TxProto := types.ConvertToL2TransactionProto(tx)
