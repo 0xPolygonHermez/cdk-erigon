@@ -269,6 +269,14 @@ func (evm *EVM) call_zkevm(typ OpCode, caller ContractRef, addr libcommon.Addres
 	var code []byte
 	if !isPrecompile {
 		code = evm.intraBlockState.GetCode(addr)
+
+		// zk - up to fork 10 we cannot handle a contract code that ends with just a push and nothing to push to the stack
+		// so check for this scenario
+		if !evm.chainConfig.IsForkID10(evm.context.BlockNumber) {
+			if code[len(code)-1] == 0x60 {
+				return nil, gas, ErrInvalidCode
+			}
+		}
 	}
 
 	snapshot := evm.intraBlockState.Snapshot()
