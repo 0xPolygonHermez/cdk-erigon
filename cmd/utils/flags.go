@@ -733,6 +733,11 @@ var (
 		Usage: "The multiplier to reduce the SMT depth by when calculating virtual counters",
 		Value: 0.6,
 	}
+	InitialBatchCfgFile = cli.StringFlag{
+		Name:  "zkevm.initial-batch.config",
+		Usage: "The file that contains the initial (injected) batch data.",
+		Value: "",
+	}
 	DebugTimers = cli.BoolFlag{
 		Name:  "debug.timers",
 		Usage: "Enable debug timers",
