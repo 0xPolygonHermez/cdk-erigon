@@ -334,22 +334,22 @@ func DefaultZkStages(
 				return stages.PruneHashStateStage(p, tx, hashState, ctx)
 			},
 		},
-		{
-			ID:          stages2.IntermediateHashes,
-			Description: "Generate intermediate hashes and computing state root",
-			Disabled:    false,
-			Forward: func(firstCycle bool, badBlockUnwind bool, s *stages.StageState, u stages.Unwinder, txc wrap.TxContainer, logger log.Logger) error {
-				_, err := SpawnZkIntermediateHashesStage(s, u, txc.Tx, zkInterHashesCfg, ctx)
-				return err
-			},
-			Unwind: func(firstCycle bool, u *stages.UnwindState, s *stages.StageState, txc wrap.TxContainer, logger log.Logger) error {
-				return UnwindZkIntermediateHashesStage(u, s, txc.Tx, zkInterHashesCfg, ctx, false)
-			},
-			Prune: func(firstCycle bool, p *stages.PruneState, tx kv.RwTx, logger log.Logger) error {
-				// TODO: implement this in zk interhashes
-				return nil
-			},
-		},
+		// {
+		// 	ID:          stages2.IntermediateHashes,
+		// 	Description: "Generate intermediate hashes and computing state root",
+		// 	Disabled:    false,
+		// 	Forward: func(firstCycle bool, badBlockUnwind bool, s *stages.StageState, u stages.Unwinder, txc wrap.TxContainer, logger log.Logger) error {
+		// 		_, err := SpawnZkIntermediateHashesStage(s, u, txc.Tx, zkInterHashesCfg, ctx)
+		// 		return err
+		// 	},
+		// 	Unwind: func(firstCycle bool, u *stages.UnwindState, s *stages.StageState, txc wrap.TxContainer, logger log.Logger) error {
+		// 		return UnwindZkIntermediateHashesStage(u, s, txc.Tx, zkInterHashesCfg, ctx, false)
+		// 	},
+		// 	Prune: func(firstCycle bool, p *stages.PruneState, tx kv.RwTx, logger log.Logger) error {
+		// 		// TODO: implement this in zk interhashes
+		// 		return nil
+		// 	},
+		// },
 		{
 			ID:                  stages2.CallTraces,
 			Description:         "Generate call traces index",
