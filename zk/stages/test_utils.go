@@ -34,7 +34,6 @@ func (c *TestDatastreamClient) EnsureConnected() (bool, error) {
 
 func (c *TestDatastreamClient) ReadAllEntriesToChannel() error {
 	c.streamingAtomic.Store(true)
-	defer c.streamingAtomic.Swap(false)
 
 	for i := range c.fullL2Blocks {
 		c.entriesChan <- &c.fullL2Blocks[i]
