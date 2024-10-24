@@ -27,7 +27,8 @@ func init() {
 }
 
 type zeroTracer struct {
-	noopTracer  // stub struct to mock not used interface methods
+	noopTracer // stub struct to mock not used interface methods
+
 	env         *vm.EVM
 	tx          types.TxnInfo
 	gasLimit    uint64      // Amount of gas bought for the whole tx
@@ -39,7 +40,7 @@ type zeroTracer struct {
 	addrOpCodes map[libcommon.Address]map[vm.OpCode]struct{}
 }
 
-func newZeroTracer(ctx *tracers.Context, cfg json.RawMessage) (tracers.Tracer, error) {
+func newZeroTracer(ctx *tracers.Context, _ json.RawMessage) (tracers.Tracer, error) {
 	return &zeroTracer{
 		tx: types.TxnInfo{
 			Traces: make(map[libcommon.Address]*types.TxnTrace),
@@ -291,24 +292,22 @@ func (t *zeroTracer) CaptureTxEnd(restGas uint64) {
 	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = t.env.IntraBlockState().GetLogs(t.ctx.Txn.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
-	receipt.BlockNumber = big.NewInt(0).SetUint64(t.ctx.BlockNum)
+	receipt.BlockNumber = new(big.Int).SetUint64(t.ctx.BlockNum)
 	receipt.TransactionIndex = uint(t.ctx.TxIndex)
 
 	receiptBuffer := &bytes.Buffer{}
-	encodeErr := receipt.EncodeRLP(receiptBuffer)
-
-	if encodeErr != nil {
-		log.Error("failed to encode receipt", "err", encodeErr)
+	err := receipt.EncodeRLP(receiptBuffer)
+	if err != nil {
+		log.Error("failed to encode receipt", "err", err)
 		return
 	}
 
 	t.tx.Meta.NewReceiptTrieNode = receiptBuffer.Bytes()
 
 	txBuffer := &bytes.Buffer{}
-	encodeErr = t.ctx.Txn.MarshalBinary(txBuffer)
-
-	if encodeErr != nil {
-		log.Error("failed to encode transaction", "err", encodeErr)
+	err = t.ctx.Txn.EncodeRLP(txBuffer)
+	if err != nil {
+		log.Error("failed to encode transaction", "err", err)
 		return
 	}
 
